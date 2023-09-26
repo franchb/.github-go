@@ -1,0 +1,55 @@
+name: release
+  
+permissions:
+    contents: write
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag to create'
+        required: true
+        default: 'v0.0.0'
+        type: string
+
+jobs:
+  run:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout with tags
+        run: git fetch --prune --unshallow --tags
+
+      - name: Create release
+        run: |
+          git log --format="%C(auto) %H %s" `git tag --sort=-committerdate | head -1`...HEAD > changelog.txt
+          echo ${{ secrets.GITHUB_TOKEN }} | gh auth login --with-token
+          gh release create ${{ github.event.inputs.tag }} -t ${{ github.event.inputs.tag }} -F changelog.tx
+
+      - name: Ping pkg.go.dev
+        run: |
+          curl --show-error --fail -w "HTTP %{http_code}\n" -o - 'https://pkg.go.dev/fetch/${{ steps.vars.outputs.module }}@${{ steps.vars.outputs.tag }}' \
+            --connect-timeout 5 \
+            --max-time 10 \
+            --retry 10 \
+            --retry-delay 30 \
+            --retry-max-time 600 \
+            -X 'POST' \
+            -H 'authority: pkg.go.dev' \
+            -H 'content-length: 0' \
+            -H 'sec-ch-ua: "Google Chrome";v="117", "Not;A=Brand";v="8", "Chromium";v="117"' \
+            -H 'sec-ch-ua-mobile: ?0' \
+            -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36' \
+            -H 'sec-ch-ua-platform: "Linux"' \
+            -H 'accept: */*' \
+            -H 'origin: https://pkg.go.dev' \
+            -H 'sec-fetch-site: same-origin' \
+            -H 'sec-fetch-mode: cors' \
+            -H 'sec-fetch-dest: empty' \
+            -H 'referer: https://pkg.go.dev/${{ steps.vars.outputs.module }}@${{ steps.vars.outputs.tag }}' \
+            -H 'accept-language: en,en-GB;q=0.9,en-US;q=0.8' \
+            --compressed \
+            || true # we don't care about success
