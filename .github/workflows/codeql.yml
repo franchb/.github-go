@@ -19,7 +19,13 @@ on:
     branches: ["main"]
   schedule:
     - cron: "0 0 * * 1"
-
+  workflow_call:
+    inputs:
+      skipTests:
+        description: 'Skip tests, useful when there is a dedicated CI job for tests'
+        default: false
+        required: false
+        type: boolean
 permissions:
   contents: read
 
