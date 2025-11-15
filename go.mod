@@ -1,3 +1,3 @@
 module github.com/franchb/.github-go
 
-go 1.20
+go 1.24
